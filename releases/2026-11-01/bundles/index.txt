@@ -1,0 +1,18 @@
+# The subscription bundles this project publishes.
+#
+# Generated 2026-10-31T23:05:10Z.
+
+all.txt          # 76400 configs
+mini.txt          # 100 configs
+lite.txt          # 300 configs
+medium.txt          # 1000 configs
+vless.txt          # 39597 configs
+vmess.txt          # 11345 configs
+trojan.txt          # 10164 configs
+shadowsocks.txt          # 12631 configs
+hysteria2.txt          # 1617 configs
+tuic.txt          # 273 configs
+wireguard.txt          # 674 configs
+reality.txt          # 13152 configs
+tls.txt          # 30660 configs
+best.txt          # 2000 configs

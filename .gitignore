@@ -1,0 +1,23 @@
+# 运行时状态与临时产物（不进版本库）
+subs/
+out/
+logs/
+.cache/
+.lock
+*.bak-*
+*.pyc
+__pycache__/
+.DS_Store
+
+# 运行目录里的脚本与仓库清单是运行时副本，仓库里只保留 scripts/ 与 data/ 下的快照
+/harvest_lite.py
+/make_v2rayn.py
+/fetch_freev2rayu.py
+/rebuild_bundles.py
+/run_daily.sh
+/run_full.sh
+/rapo.txt
+
+# 但资料快照要参与版本管理
+!data/
+!releases/
