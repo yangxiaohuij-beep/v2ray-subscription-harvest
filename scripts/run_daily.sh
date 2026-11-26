@@ -33,11 +33,13 @@ fi
 
 if [ "$MODE" = "full" ]; then
   LOG="$RUN/logs/full-$STAMP.log"
-  EXTRA=""
+  EXTRA="--retired-days 30"
   LABEL="全量重证"
 else
   LOG="$RUN/logs/daily-$STAMP.log"
-  EXTRA="--only-new"
+  # --max-new 600：每天最多证 600 条新链接，候选暴涨时不会把调度器 3600s 硬超时顶穿
+  # --retired-days 30：近期退役的源不再被 collect 收回来重证（2026-11-26 事故后的护栏）
+  EXTRA="--only-new --max-new 600 --retired-days 30"
   LABEL="增量"
 fi
 echo $$ > "$LOCK"

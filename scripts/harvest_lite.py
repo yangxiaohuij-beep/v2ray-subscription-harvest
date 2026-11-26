@@ -585,6 +585,39 @@ def append_retired(path: Path, entries: list[tuple[str, str]]) -> None:
     path.write_text(existing.rstrip("\n") + "\n" + "\n".join(lines) + "\n", encoding="utf-8")
 
 
+def retired_recently(max_days: int, path: Path | None = None) -> set[str]:
+    """retired.txt 里最近 max_days 天退役的 URL。
+
+    退役会把记录从 status.json 里移除，于是第二天 collect 又把同一个 URL 从 README
+    里收回来、被当成「新链接」重新证一遍 —— 死循环会把每日耗时顶穿（2026-11-26 事故）。
+    所以 collect 阶段按退役时间跳过近期退役的源；超过窗口后仍允许回归复评。
+    """
+    if max_days <= 0:
+        return set()
+    source = path or SUBS_RETIRED
+    if not source.exists():
+        return set()
+    recent: set[str] = set()
+    for line in source.read_text(encoding="utf-8", errors="ignore").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split("\t")
+        if len(parts) < 3:
+            continue
+        url = parts[2].strip()
+        age = days_since(parts[0])
+        if url and age is not None and age <= max_days:
+            recent.add(url)
+    return recent
+
+
+def cap_new_links(pending: list[str], max_new: int) -> list[str]:
+    """把「本轮要证的新链接」截断到 max_new 条，其余留到后续运行消化。"""
+    if max_new and max_new > 0 and len(pending) > max_new:
+        return pending[:max_new]
+    return pending
+
+
 def prune_stale(records: dict, *, alive_key: str, change_key: str | None,
                 max_days: int) -> list[tuple[str, str]]:
     retired: list[tuple[str, str]] = []
@@ -823,6 +856,12 @@ def stage_collect(args) -> dict[str, str]:
                 break
 
     SUBS_CANDIDATES.parent.mkdir(parents=True, exist_ok=True)
+    skip = retired_recently(getattr(args, "retired_days", 0))
+    if skip:
+        dropped = [url for url in origin if url in skip]
+        for url in dropped:
+            origin.pop(url, None)
+        log(f"skipped {len(dropped)} links retired within {args.retired_days} days")
     SUBS_CANDIDATES.write_text(
         "\n".join(f"{url}\t{repo}" for url, repo in origin.items()) + "\n", encoding="utf-8")
     log(f"{len(origin)} unique candidates written to {SUBS_CANDIDATES.name}")
@@ -838,7 +877,11 @@ def stage_prove(args, origin: dict[str, str] | None = None) -> dict:
         return load_json(SUBS_STATUS, {"generatedAt": "", "links": {}})
     status = load_json(SUBS_STATUS, {"generatedAt": "", "links": {}})
     stamp = now_iso()
-    pending = [u for u in origin if not args.only_new or u not in status["links"]]
+    raw_pending = [u for u in origin if not args.only_new or u not in status["links"]]
+    pending = cap_new_links(raw_pending, getattr(args, "max_new", 0))
+    if len(pending) < len(raw_pending):
+        log(f"capping new links at {args.max_new} (of {len(raw_pending)} pending) "
+            f"— the rest will be picked up on later runs")
     log(f"proving {len(pending)} links, {args.samples} servers sampled from each")
 
     endpoint_owners: dict[tuple[str, int], set[str]] = {}
@@ -1094,6 +1137,8 @@ def add_common(parser: argparse.ArgumentParser) -> None:
 def add_collect_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--refresh", action="store_true", help="ignore the README cache")
     parser.add_argument("--no-guess", action="store_true", help="skip common-path guessing")
+    parser.add_argument("--retired-days", type=int, default=30,
+                        help="skip links retired within N days (0 = disable, default 30)")
     parser.add_argument("--tree", action="store_true",
                         help="list files via the API when a README gives nothing")
     parser.add_argument("--tree-budget", type=int, default=50,
@@ -1109,6 +1154,8 @@ def add_prove_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--tcp-timeout", type=float, default=3.0, help="seconds per TCP probe")
     parser.add_argument("--per-source", type=int, default=600,
                         help="configs taken from any one source into the bundles")
+    parser.add_argument("--max-new", type=int, default=0,
+                        help="cap how many not-yet-recorded links are proved this run (0 = no cap)")
     parser.add_argument("--no-bundles", action="store_true", help="skip publishing bundles/")
 
 

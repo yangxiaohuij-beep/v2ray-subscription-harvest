@@ -16,6 +16,7 @@ __pycache__/
 /rebuild_bundles.py
 /run_daily.sh
 /run_full.sh
+/catchup_*.sh
 /rapo.txt
 
 # 但资料快照要参与版本管理
